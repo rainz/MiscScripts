@@ -58,7 +58,7 @@ def getPrices(url):
     except requests.exceptions.RequestException, e:
         logging.warn("Connection error: " + e.message)
         return None, None
-    #html_text = page.text.encode('ascii', 'ignore')
+    #html_text = url_response.text.encode('ascii', 'ignore')
     html_text = url_response.text
     soup = BeautifulSoup(html_text, "html.parser")
     prices = soup.find("div", {"id": "PriceDisplay"})
