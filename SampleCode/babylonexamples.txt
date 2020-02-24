@@ -1,0 +1,729 @@
+Laser:
+// You have to create a function called createScene. This function must return a BABYLON.Scene object
+// You can reference the following variables: scene, canvas
+// You must at least define a camera
+// More info here: https://github.com/BabylonJS/Babylon.js/wiki/The-Playground
+
+var createScene = function() {
+var scene = new BABYLON.Scene(engine, true);
+//var camera = new BABYLON.FreeCamera("camera1", new BABYLON.Vector3(0, 5, -10), scene);
+var camera2 = new BABYLON.ArcRotateCamera("camera2", Math.PI / 2, Math.PI / 2, 10, BABYLON.Vector3.Zero(), scene);
+
+// This attaches the camera to the canvas
+camera2.attachControl(canvas, true);
+camera2.wheelPrecision = 20;
+
+// This creates a light, aiming 0,1,0 - to the sky (non-mesh)
+var light = new BABYLON.HemisphericLight("light1", new BABYLON.Vector3(0, 1, 0), scene);
+
+// Default intensity is 1. Let's dim the light a small amount
+light.intensity = 0.7;
+
+// Our built-in 'sphere' shape. Params: name, subdivs, size, scene
+var sphere = BABYLON.Mesh.CreateSphere("sphere1", 16, 0.5, scene);
+var materialSphere1 = new BABYLON.StandardMaterial("texture1", scene);
+//materialSphere1.wireframe = true;
+var sphere2 = BABYLON.Mesh.CreateSphere("sphere1", 16, 0.5, scene);
+
+sphere2.position.y = 1;
+sphere2.position.x = 1.5
+// Move the sphere upward 1/2 its height
+sphere.position.y = 1;
+  //Creation of a material with an image texture
+    var materialSphere3 = new BABYLON.StandardMaterial("texture3", scene);
+    materialSphere3.diffuseTexture = new BABYLON.Texture("https://thumbs.dreamstime.com/z/hexagons-black-stone-green-hot-streaks-energy-seamless-vector-texture-technology-seamless-pattern-geometric-72366301.jpg", scene);
+sphere.material = materialSphere3
+// Our built-in 'ground' shape. Params: name, width, depth, subdivs, scene
+var ground = BABYLON.Mesh.CreateGround("ground1", 30, 30, 2, scene);
+
+BABYLON.Effect.ShadersStore["customVertexShader"] = 'precision highp float;  attribute vec3 position; attribute vec3 normal; attribute vec2 uv;  uniform mat4 worldViewProjection; uniform float time;  varying vec3 vPosition; varying vec3 vNormal; varying vec2 vUV;  void main(void) {     vec3 v = position;     gl_Position = worldViewProjection * vec4(v, 1.0);     vPosition = position;     vNormal = normal;     vUV = uv; }';
+BABYLON.Effect.ShadersStore["customFragmentShader"] = `
+#extension GL_OES_standard_derivatives : enable
+precision highp float;   
+        	
+// Varying
+varying vec3 vPosition;
+varying vec3 vNormal;
+varying vec2 vUV;
+
+// Refs
+uniform vec3 color;
+uniform vec3 cameraPosition;
+        	
+ 
+void main(void) {          
+    float x = vUV.x;
+    float y = vUV.y;
+    vec2 uv=-1.+2.*vUV;
+    float a=  1.-smoothstep(-.9,0.9,abs(uv.x));//*(1.-vUV.y))*1.);
+    float b=1.-pow(0.1,vUV.y);
+    vec3 col=vec3(0.,b*8.,0.);
+    gl_FragColor = vec4(col,a);
+}`;
+
+var laserMaterial = new BABYLON.ShaderMaterial("shader", scene, {
+    vertex: "custom",
+    fragment: "custom",
+},
+    {
+        needAlphaBlending: true,
+        attributes: ["position", "normal", "uv"],
+        uniforms: [  "time","worldViewProjection"]
+    });
+
+
+var laserlen = 50;
+var plane = BABYLON.MeshBuilder.CreatePlane("pl", { width: .2, height: laserlen }, scene);
+var plane2 = BABYLON.MeshBuilder.CreatePlane("pl", { width: .2, height: laserlen }, scene);
+plane2.rotation.y = Math.PI / 2;
+var matrix = BABYLON.Matrix.Translation(0, laserlen/2, 0);
+plane.setPivotMatrix(matrix);
+plane2.setPivotMatrix(matrix);
+plane.parent = sphere;
+plane2.parent = sphere;
+sphere.rotation.x = Math.PI / 2;
+
+laserMaterial.setColor3('color', new BABYLON.Color3(0, 1, 0));
+laserMaterial.setVector3('cameraPosition', BABYLON.Vector3.Zero());
+laserMaterial.setFloat('time', 0.0);
+laserMaterial.alphaMode = BABYLON.Engine.ALPHA_ADD;
+laserMaterial.alpha = 0.99999;
+laserMaterial.backFaceCulling = false;
+
+plane.material = laserMaterial;
+plane2.material = laserMaterial;
+var k = 0;
+scene.registerBeforeRender(function () {
+    laserMaterial.setVector3('cameraPosition', camera2.position);
+    sphere.rotation.z = Math.sin(k);
+    k += 2.1;
+   // sphere.position.y += 0.05
+});
+//shooting
+var bullets = []
+//window.addEventListener("click", function () {
+		//if (!this.scene.isReady()) return;
+setInterval(function(){
+		var bulletPosition = sphere.position;
+		
+		var bulletId = bullets.length + 1;
+		
+		bullets[bulletId] = BABYLON.Mesh.CreateSphere('bullet', 3, 0.5, scene);
+		bullets[bulletId].position = sphere.position.clone();
+		bullets[bulletId].rotation.copyFrom(sphere.rotation);
+		bullets[bulletId].speed = 2;
+		bullets[bulletId].lifetimer = 60;
+		bullets[bulletId].material = new BABYLON.StandardMaterial('texture1', scene);
+		bullets[bulletId].material.diffuseColor = new BABYLON.Color3(3, 2, 0);
+},2000)
+
+scene.onPointerDown = function(ev,piK){
+    if(piK.hit){
+        sphere2.position = piK.pickedPoint
+    }
+}
+engine.runRenderLoop(function () {
+    //this.scene.render();
+	sphere.rotation.y += 0.004;
+	//sphere.lookAt(new BABYLON.Vector3(sphere2.position.x,sphere2.position.y,sphere2.position.z))
+	
+	for (var i = 0, max = bullets.length; i < max; i += 1){
+		if (!bullets[i] || bullets[i] == undefined) continue; //Empty, Skip.
+		bullets[i].lifetimer -= 1;
+        if (bullets[i].lifetimer < 0){
+              bullets[i].dispose(true); 
+         }
+         bullets[i].lookAt(sphere2.absolutePosition);
+         bullets[i].locallyTranslate(new BABYLON.Vector3(0, 0.05, -0.05))
+	
+	}
+    
+ });
+
+	return scene;
+};
+
+============================================================
+Rings
+
+// script importation
+//var url = "http://cdn.rawgit.com/RNasimiAsl/Extensions/master/ShaderBuilder/Babylonx.ShaderBuilder.js";
+var url = "https://rawgit.com/BabylonJS/Extensions/master/ShaderBuilder/Babylonx.ShaderBuilder.js";
+
+//         https://raw.githubusercontent.com/BabylonJS/Extensions/master/ShaderBuilder/Babylonx.ShaderBuilder.js
+var s = document.createElement("script");
+s.src = url;
+document.head.appendChild(s);
+
+var time = 0;
+var camera;
+ 
+    var LOADING = function(name,scene,radius,height,speed,color,pos,meshType){
+
+             meshType = BABYLONX.Shader.Def(meshType,'cylinder');
+             color = BABYLONX.Shader.Def(color,{r:1.,g:1.,b:1.,a:0.1 });
+              pos = BABYLONX.Shader.Def(pos,{x:1.,y:1.,z:1. });
+             
+            var loadingMesh ;
+           switch(meshType){
+           case 'cylinder': loadingMesh =  BABYLON.Mesh.CreateCylinder(name,height,radius,radius,30,60,scene);
+            break;
+           
+             case 'sphere': loadingMesh =  BABYLON.Mesh.CreateSphere(name, 30,radius,scene);
+             loadingMesh.scaling.y = height/radius;
+            break;
+            
+
+           } 
+              var s = 'sin(16.*pos.y/'+BABYLONX.Shader.Print(height)+ '-sin(pos.x*0.1/'
+              +BABYLONX.Shader.Print(height)+ ')+1.*speed*time*0.1),sin(  16.*pos.y/'
+              +BABYLONX.Shader.Print(height)+ '+cos(pos.z*0.1/'
+              +BABYLONX.Shader.Print(height)+ ')+1.*speed*time*0.1  )*0.2 ,0.';
+        
+             loadingMesh.material =   new BABYLONX.ShaderBuilder()
+           .SetUniform('color','vec4')
+           .SetUniform('speed','float')
+         .VertexShader('result = vec4(pos+nrm*( length(vec3('+s+')))*0.6,1.);')
+         .InLine('result = vec4( '+s+',1.);')
+          
+         .InLine('result = vec4( color.xyz,min((5.-16.*pos.y/'+BABYLONX.Shader.Print(height)+ ' ),16.*pos.y/'+BABYLONX.Shader.Print(height)+
+          '*0.5+4.)*color.w*length(result.xyz)/1.5);')
+         .Back('result.xyz = color.xyz;')
+          .Transparency()
+           .BuildMaterial(scene);
+
+         loadingMesh.material.setVector4('color',new BABYLON.Vector4(color.r,color.g,color.b,color.a));
+        loadingMesh.material.setFloat('speed',speed);
+         loadingMesh.position.x = pos.x;
+         loadingMesh.position.y = pos.y;
+         loadingMesh.position.z = pos.z;
+         return loadingMesh;
+         };
+
+var createScene = function () {
+
+    // This creates a basic Babylon Scene object (non-mesh)
+    var scene = new BABYLON.Scene(engine); 
+    // This creates and positions a free camera (non-mesh)
+      camera = new BABYLON.ArcRotateCamera("camera1",3.,3.,0., new BABYLON.Vector3(0, 35, -80), scene);
+
+    // This targets the camera to scene origin
+    camera.setTarget(BABYLON.Vector3.Zero());
+
+    // This attaches the camera to the canvas
+    camera.attachControl(canvas, true);
+
+    // This creates a light, aiming 0,1,0 - to the sky (non-mesh)
+    var light = new BABYLON.HemisphericLight("light1", new BABYLON.Vector3(0, 1, 0), scene);
+
+    // Default intensity is 1. Let's dim the light a small amount
+    light.intensity = 0.7;
+	
+	 s.onload = function (params) {
+  		BABYLONX.ShaderBuilder.InitializeEngine();
+      
+		// Our built-in 'sphere' shape. Params: name, subdivs, size, scene
+		  
+	 
+	 
+       
+
+        var sphere = BABYLON.Mesh.CreateSphere("s",10,15,scene); 
+        var l1 =  LOADING("l1",scene,18,15, 1.,{r:1.,g:1.,b:0.,a:0.1 },sphere.position); 
+        
+         var sphere2 = BABYLON.Mesh.CreateSphere("s",10,15,scene); 
+         sphere2.position.x = 25;
+         var l2 =  LOADING("l1",scene,18,25, 1.,{r:1.,g:1.,b:0.,a:0.1 },sphere2.position,'sphere'); 
+
+         var sphere3 = BABYLON.Mesh.CreateSphere("s",10,15,scene); 
+         sphere3.position.x = -25;
+         var l3 =  LOADING("l1",scene,28,20, -1.5,{r:1.,g:0.,b:0.,a:0.5 },sphere3.position); 
+ 
+        
+        
+	 
+		 scene.registerBeforeRender(function () {
+          
+		   time++;
+           l1.material.setVector4('color',{x:Math.sin(time*0.0012+0.215545),y:Math.sin(time*0.01),z:1,w:0.4})
+           l2.material.setFloat('speed',Math.sin(time*0.01) )
+          
+            new BABYLONX.ShaderMaterialHelper().SetUniforms(
+                scene.meshes,
+                camera.position,
+                camera.target,
+                 { x: 0, y: 0 },
+                 { x: 100, y: 100 },
+			time);
+				 
+
+	});
+	 
+
+	      
+	}
+
+	
+    
+    return scene;
+
+};
+
+===================================================
+Fire (particle)
+
+// You have to create a function called createScene. This function must return a BABYLON.Scene object
+// You can reference the following variables: scene, canvas
+// You must at least define a camera
+// More info here: https://doc.babylonjs.com/generals/The_Playground_Tutorial
+
+var createScene = function() {
+
+
+    var scene = new BABYLON.Scene(engine);
+           // Configuring camera
+    var camera = new BABYLON.ArcRotateCamera("camera", -1.85, 1.771, -0.9, BABYLON.Vector3.Zero(), scene);
+    camera.attachControl(canvas, true);
+    camera.wheelPrecision = 200.0;
+    camera.minZ = 0.01;
+    camera.maxZ = 1000;
+
+    scene.clearColor = new BABYLON.Color4(0.02, 0.02, 0.02, 1.0);
+	scene.imageProcessingConfiguration.contrast = 1.6;
+	scene.imageProcessingConfiguration.exposure = 0.6;
+	scene.imageProcessingConfiguration.toneMappingEnabled = true;
+
+    var hdrTexture = BABYLON.CubeTexture.CreateFromPrefilteredData("textures/environment.dds", scene);
+	hdrTexture.gammaSpace = false;
+
+    // This creates a light, aiming 0,1,0 - to the sky (non-mesh)
+    var light = new BABYLON.HemisphericLight("light1", new BABYLON.Vector3(0, 1, 0), scene);
+    // Default intensity is 1. Let's dim the light a small amount
+    light.intensity = 1;
+
+        
+        // Emitters
+        var emitter0 = BABYLON.Mesh.CreateBox("emitter0", 0.01, scene);
+        emitter0.position = new BABYLON.Vector3(-0.12, 1 , 0);
+        emitter0.isVisible = false;
+
+         // Emitters
+        var emitter2 = BABYLON.Mesh.CreateBox("emitter2", 0.01, scene);
+        emitter2.position = new BABYLON.Vector3(0.12, 1 , 0);
+        emitter2.isVisible = false;
+
+        var emitter1 = BABYLON.Mesh.CreateBox("emitter0", 0.1, scene);
+        emitter1.isVisible = false;
+
+       // mirror.material.reflectionTexture.renderList.push(emitter0);
+        //mirror.material.reflectionTexture.renderList.push(emitter1);
+
+        // Particles
+                // Particles
+        var particleSystem = new BABYLON.ParticleSystem("particles", 100, scene);
+        //particleSystem.particleTexture = new BABYLON.Texture("/textures/Flare.png", scene);
+        
+        particleSystem.particleTexture = new BABYLON.Texture("/textures/fire.jpg", scene);
+        particleSystem.blendMode = BABYLON.ParticleSystem.BLENDMODE_ONEONE;
+
+        particleSystem.minAngularSpeed = -0.05;
+        particleSystem.maxAngularSpeed = 0.05;
+        particleSystem.minSize = 0.01;
+        particleSystem.maxSize = 0.1;
+        particleSystem.minLifeTime = 0.1;
+        particleSystem.maxLifeTime = 0.5;
+        particleSystem.minEmitPower = 0.5;
+        particleSystem.maxEmitPower = 1.0;
+        particleSystem.emitter = emitter0;
+        particleSystem.emitRate = 200;
+        particleSystem.minEmitBox = new BABYLON.Vector3(0, 0, 0);
+        particleSystem.maxEmitBox = new BABYLON.Vector3(0, 0, 0);
+        particleSystem.direction1 = new BABYLON.Vector3(0.0, 1, 0);
+        particleSystem.direction2 = new BABYLON.Vector3(0.0, 1, 0);
+        particleSystem.color1 = new BABYLON.Color3(0.88, .35, .13);
+        particleSystem.color2 = new BABYLON.Color3(0.88, .35, .13);
+        //particleSystem.gravity = new BABYLON.Vector3(0, -2.0, 0);
+        particleSystem.start();
+
+        // Particles
+        var particleSystem3 = new BABYLON.ParticleSystem("particles", 100, scene);
+        //particleSystem.particleTexture = new BABYLON.Texture("/textures/Flare.png", scene);
+        
+        particleSystem3.particleTexture = new BABYLON.Texture("/textures/fire.jpg", scene);
+        particleSystem3.blendMode = BABYLON.ParticleSystem.BLENDMODE_ONEONE;
+
+        particleSystem3.minAngularSpeed = -0.05;
+        particleSystem3.maxAngularSpeed = 0.05;
+        particleSystem3.minSize = 0.01;
+        particleSystem3.maxSize = 0.1;
+        particleSystem3.minLifeTime = 0.1;
+        particleSystem3.maxLifeTime = 0.5;
+        particleSystem3.minEmitPower = 0.5;
+        particleSystem3.maxEmitPower = 1.0;
+        particleSystem3.emitter = emitter2;
+        particleSystem3.emitRate = 200;
+        particleSystem3.minEmitBox = new BABYLON.Vector3(0, 0, 0);
+        particleSystem3.maxEmitBox = new BABYLON.Vector3(0, 0, 0);
+        particleSystem3.direction1 = new BABYLON.Vector3(-0.75, 1, 0);
+        particleSystem3.direction2 = new BABYLON.Vector3(-0.75, 1, 0);
+        particleSystem3.color1 = new BABYLON.Color3(0.88, .35, .13);
+        particleSystem3.color2 = new BABYLON.Color3(0.88, .35, .13);
+        //particleSystem.gravity = new BABYLON.Vector3(0, -2.0, 0);
+        //particleSystem3.start();
+
+        /*
+        var particleSystem = new BABYLON.ParticleSystem("particles", 4000, scene);
+        particleSystem.emitter = emitter0;
+        particleSystem.particleTexture = new BABYLON.Texture("textures/Flare.png", scene);
+
+        particleSystem.minAngularSpeed = -0.5;
+        particleSystem.maxAngularSpeed = 0.5;
+
+        particleSystem.minSize = 0.1;
+        particleSystem.maxSize = 0.5;
+
+        particleSystem.minLifeTime = 0.5;
+        particleSystem.maxLifeTime = 2.0;
+
+        particleSystem.minEmitPower = 0.5;
+        particleSystem.maxEmitPower = 4.0;
+
+        //particleSystem.emitRate = 400;
+
+        particleSystem.blendMode = BABYLON.ParticleSystem.BLENDMODE_ONEONE;
+
+        particleSystem.minEmitBox = new BABYLON.Vector3(-0.5, 0, -0.5);
+        particleSystem.maxEmitBox = new BABYLON.Vector3(0.5, 0, 0.5);
+
+        //particleSystem.direction1 = new BABYLON.Vector3(-1, 1, -1);
+        //particleSystem.direction2 = new BABYLON.Vector3(1, 1, 1);
+
+        //particleSystem.color1 = new BABYLON.Color4(1, 0, 0, 1);
+        //particleSystem.color2 = new BABYLON.Color4(0, 1, 1, 1);
+
+        //particleSystem.gravity = new BABYLON.Vector3(0, -2.0, 0);
+
+        particleSystem.start();*/
+
+        var particleSystem2 = new BABYLON.ParticleSystem("particles", 40000, scene);
+        particleSystem2.particleTexture = new BABYLON.Texture("textures/Flare.png", scene);
+        particleSystem2.minSize = 0.001;
+        particleSystem2.maxSize = 0.02;
+        particleSystem2.minEmitPower = 1.0;
+        particleSystem2.maxEmitPower = 3.0;
+        particleSystem2.minLifeTime = 0.5;
+        particleSystem2.maxLifeTime = 1.0;
+        particleSystem2.emitter = emitter1;
+        particleSystem2.emitRate = 100;
+        particleSystem2.blendMode = BABYLON.ParticleSystem.BLENDMODE_ONEONE;
+        particleSystem2.minEmitBox = new BABYLON.Vector3(0, 0, 0);
+        particleSystem2.maxEmitBox = new BABYLON.Vector3(0, 0, 0);
+       // particleSystem2.gravity = new BABYLON.Vector3(0, -0.5, 0);
+        particleSystem2.direction1 = new BABYLON.Vector3(0, 0, 0);
+        particleSystem2.direction2 = new BABYLON.Vector3(0, 0, 0);
+        //particleSystem2.start();
+
+        var alpha = 0;
+        scene.registerBeforeRender(function () {
+            emitter1.position.x = 0.05 * Math.cos(alpha);
+            emitter1.position.y = 1.0;
+            emitter1.position.z = 0.05 * Math.sin(alpha);
+
+            alpha += 0.05 * scene.getAnimationRatio();
+        });
+
+
+        // Append sample glTF model to scene
+    BABYLON.SceneLoader.Append("https://api.remix3d.com:443/v3/creations/G009SX0NCC71/gltf/12/306a468b-0000-0000-7a48-6505db2a84f9/952/", "1501769356733.gltf?parameters=eyJmb3JtYXQiOiJHTFRGIiwiY2xpZW50Ijoid2ViIiwidXNhZ2UiOiJWaWV3In01", scene, 
+    
+    function(scene) {
+        scene.createDefaultSkybox(hdrTexture, true, 100, 0.3);
+        
+        var rootMesh = scene.getMeshByName("root");
+        camera.target = rootMesh;
+        rootMesh.position = new BABYLON.Vector3(0, 1, 0);
+        emitter0.position = new BABYLON.Vector3(0, 1.135, 0);
+    },
+    function (scene) {
+    }, function (scene) {
+        //alert("error");
+    });
+
+	return scene;
+};
+
+==================================================
+Spark globe
+
+ var url = "http://cdn.rawgit.com/NasimiAsl/Extensions/master/GeometryBuilder/SGB.js";
+var s = document.createElement("script");
+s.src = url;
+document.head.appendChild(s);
+
+var camera = null;
+var tube=null,path=[];
+var createScene = function () {
+
+    // This creates a basic Babylon Scene object (non-mesh)
+    var scene = new BABYLON.Scene(engine);
+	scene.clearColor = new BABYLON.Color4(0,0,0.2,1.); 
+    // This creates and positions a free camera (non-mesh)
+   camera = new BABYLON.ArcRotateCamera("camera1",1,1,10,  new BABYLON.Vector3(0, 30, 235), scene);
+
+    // This targets the camera to scene origin
+    camera.setTarget(BABYLON.Vector3.Zero());
+
+    // This attaches the camera to the canvas
+    camera.attachControl(canvas, true);
+	   // This creates a light, aiming 0,1,0 - to the sky (non-mesh)
+    var light = new BABYLON.HemisphericLight("light1", new BABYLON.Vector3(0, 1, 0), scene);
+
+    // Default intensity is 1. Let's dim the light a small amount
+    light.intensity = 0.7;
+
+    // var plan = new BABYLON.Mesh.CreatePlane("p1",150,scene);
+    var sphere1 = BABYLON.Mesh.CreateSphere("Sphere", 16, 10, scene);
+    sphere1.position = new BABYLON.Vector3(-16, 0, 0);
+    var sphere2 = BABYLON.Mesh.CreateSphere("Spheres", 16, 10, scene);
+    sphere2.position = new BABYLON.Vector3(16, 0, 0);
+
+ var mat = new BABYLON.StandardMaterial("mat1", scene);
+
+
+     //Highlight layer
+    var options = {
+        alphaBlendingMode: 2,
+        blurHorizontalSize: 1,
+        blueTextureSizeRatio: 0.5,
+        blurVerticalSize: 1,
+        mainTextureRatio: 0.25
+    };
+	// var hl = new BABYLON.HighlightLayer("hg", scene, options);
+	// // var hl = new BABYLON.HighlightLayer("hg", scene);
+    // hl.innerGlow = false;
+    // hl.outerGlow = true;
+    // setInterval(function(){
+        //--> strange error on this line...
+    // // hl.addMesh(tube, new BABYLON.Color3(Math.random()*0, Math.random()*0, Math.random()*1));
+    // })
+
+	 s.onload = function (params) { 
+		  BABYLONX.ShaderBuilder.InitializeEngine();		
+          portailEffect(sphere1, scene, camera);
+          		
+          portailEffect(sphere2, scene, camera);
+	}
+
+{
+    var plane = BABYLON.Mesh.CreatePlane('spark', 23, scene);
+
+    var material = new BABYLON.StandardMaterial('material', scene);
+    var texture = new BABYLON.DynamicTexture('spark', 128, scene);
+    var ctx = texture.getContext();
+
+	texture.hasAlpha = true;
+
+    material.emissiveTexture = texture;
+    material.opacityTexture = texture;
+    material.disableLighting = true;
+
+    plane.material = material;
+    plane.billboardMode = BABYLON.AbstractMesh.BILLBOARDMODE_X;
+
+var glow = new Image();
+glow.src = "data:image/png;base64,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";
+
+
+var getSparkPoints = function(sin, length, waveTop, waves, sparkLevel){
+    var points = [];
+    for(var i=0; i<length; i++){
+        var done = i / (length - 1);
+        var done2 = (i * waves) / (length - 1);
+        var iSin = Math.sin(sin + done2 * Math.PI * 2);
+        var pointX = 128 * done;
+        var pointY = 64;
+        var offX = Math.random() * sparkLevel - Math.random() * sparkLevel;
+        var offY = Math.random() * sparkLevel - Math.random() * sparkLevel;
+        points.push(new BABYLON.Vector2(pointX + offX, pointY + pointY * waveTop * iSin + offY));
+    }
+    return points;
+}
+
+var drawSpark = function(sin, length, waveTop, waves, sparkLevel, glowEvery, glowWidthScale, glowHeightScale){
+    points = getSparkPoints(sin, length, waveTop, waves, sparkLevel);
+    ctx.beginPath();
+    ctx.moveTo(points[0].x,points[0].y);
+    var width = Math.round(glowWidthScale * 104);
+    var height = Math.round(glowHeightScale * 104);
+    for(var i=1; i<points.length; i++){
+        if(i % glowEvery === 0){
+            ctx.drawImage(glow, points[i].x - Math.round(width / 2), points[i].y - Math.round(height / 2), width, height);
+        }
+        ctx.lineTo(points[i].x, points[i].y);
+    }
+    ctx.stroke();
+}
+
+var frameCounter = 0;
+var slideCounter = 0;
+
+var updateEvery = 6; // frames
+var slideSpeed = 2;
+var numberOfLinePoints = 100;
+var glowWidthScale = 0.15; // width scale of the glow image, from 0 to 1
+var glowHeightScale = 0.15; // height scale of the glow image, from 0 to 1
+var glowEvery = 2; // draw the glow image every x points
+var waveTop = 0.1; // the wave maximum from 0 to 1
+var waveTops = 2; // number of sine waves
+var sparkLevel = 2; // the maximum random point offset / sparkyness
+var lineWidth = 2;
+
+
+    scene.registerBeforeRender(function () {
+        if(frameCounter++ === updateEvery){
+        ctx.clearRect(0,0,128,128);
+        drawSpark(slideCounter++ * slideSpeed, numberOfLinePoints, waveTop, waveTops, sparkLevel, glowEvery, glowWidthScale, glowHeightScale);
+        ctx.strokeStyle='#FFFFFF';
+        ctx.lineWidth=lineWidth;
+        texture.update();
+        frameCounter = 0;
+        }
+    });
+}
+ 
+    return scene; 
+};
+
+
+
+
+var portailEffect = function(mesh, scene, camera)
+{
+    var time = 0;
+    var materialEffect = new BABYLONX.ShaderBuilder().InLine('\
+    vec3 wpos = pos * vec3(1.0, 1.0, 1.0);\
+    float ns = 0.1 + abs(noise(wpos * 0.031  +vec3(time * 0.01, -time * 0.01, time * 0.01)  ));\
+    ns =  min(ns, ns * pow(cos(wpos.y * 0.1 - time * 0.1), 0.6));\
+    float ns0 = min(1.0, max(0.0, pow(ns, 5.0) * 500.));\
+    float ns1 = min(1.0, max(0.0, pow(ns,4.0) * 1000.));\
+    ns1 = min(1.0, max(0.0, pow(ns1, 2.8) * 50.0));\
+    float ns2 = min(1.0, max(0.0, mod(pow(ns, 3.0) * 130.0, 0.01) * 13.0));\
+    \
+    result = vec4(vec3(1.0), max((1.0 - ns0) / 10.0, (1.0 - ns1) * 1.0));').Transparency().Back().BuildMaterial(scene);	
+     var k = 0;	 
+    scene.registerBeforeRender(function () {			 	
+        new BABYLONX.ShaderMaterialHelper().SetUniforms(scene.meshes, camera.position, camera.target, { x: 0, y: 0 }, { x: 100, y: 100 }, time++);
+         
+
+
+            // tube = BABYLON.Mesh.CreateLines(null, path, null, null, tube);
+
+
+            k += 0.09;
+    });
+    mesh.material = materialEffect;
+}
+ 
+ ==================================================
+ Electric wave
+ 
+ var createScene = function () {
+
+    // This creates a basic Babylon Scene object (non-mesh)
+    var scene = new BABYLON.Scene(engine);
+
+    // This creates and positions a free camera (non-mesh)
+    var camera = new BABYLON.FreeCamera("camera1", new BABYLON.Vector3(0, 0, -2), scene);
+
+    // This targets the camera to scene origin
+    camera.setTarget(BABYLON.Vector3.Zero());
+
+    // This attaches the camera to the canvas
+    camera.attachControl(canvas, true);
+
+    // This creates a light, aiming 0,1,0 - to the sky (non-mesh)
+    var light = new BABYLON.HemisphericLight("light1", new BABYLON.Vector3(0, 1, 0), scene);
+
+    // Default intensity is 1. Let's dim the light a small amount
+    light.intensity = 0.7;
+
+    
+
+    var plane = BABYLON.Mesh.CreatePlane('spark', 1, scene);
+
+    var material = new BABYLON.StandardMaterial('material', scene);
+    var texture = new BABYLON.DynamicTexture('spark', 128, scene);
+    var ctx = texture.getContext();
+
+	texture.hasAlpha = true;
+
+    material.emissiveTexture = texture;
+    material.opacityTexture = texture;
+    material.disableLighting = true;
+
+    plane.material = material;
+    //plane.billboardMode = BABYLON.AbstractMesh.BILLBOARDMODE_ALL;
+
+var glow = new Image();
+glow.src = "data:image/png;base64,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";
+
+
+var getSparkPoints = function(sin, length, waveTop, waves, sparkLevel){
+    var points = [];
+    for(var i=0; i<length; i++){
+        var done = i / (length - 1);
+        var done2 = (i * waves) / (length - 1);
+        var iSin = Math.sin(sin + done2 * Math.PI * 2);
+        var pointX = 128 * done;
+        var pointY = 64;
+        var offX = Math.random() * sparkLevel - Math.random() * sparkLevel;
+        var offY = Math.random() * sparkLevel - Math.random() * sparkLevel;
+        points.push(new BABYLON.Vector2(pointX + offX, pointY + pointY * waveTop * iSin + offY));
+    }
+    return points;
+}
+
+var drawSpark = function(sin, length, waveTop, waves, sparkLevel, glowEvery, glowWidthScale, glowHeightScale){
+    points = getSparkPoints(sin, length, waveTop, waves, sparkLevel);
+    ctx.beginPath();
+    ctx.moveTo(points[0].x,points[0].y);
+    var width = Math.round(glowWidthScale * 104);
+    var height = Math.round(glowHeightScale * 104);
+    for(var i=1; i<points.length; i++){
+        if(i % glowEvery === 0){
+            ctx.drawImage(glow, points[i].x - Math.round(width / 2), points[i].y - Math.round(height / 2), width, height);
+        }
+        ctx.lineTo(points[i].x, points[i].y);
+    }
+    ctx.stroke();
+}
+
+var frameCounter = 0;
+var slideCounter = 0;
+
+var updateEvery = 6; // frames
+var slideSpeed = 2;
+var numberOfLinePoints = 100;
+var glowWidthScale = 0.15; // width scale of the glow image, from 0 to 1
+var glowHeightScale = 0.15; // height scale of the glow image, from 0 to 1
+var glowEvery = 2; // draw the glow image every x points
+var waveTop = 0.1; // the wave maximum from 0 to 1
+var waveTops = 2; // number of sine waves
+var sparkLevel = 2; // the maximum random point offset / sparkyness
+var lineWidth = 2;
+
+
+    scene.registerBeforeRender(function () {
+        if(frameCounter++ === updateEvery){
+        ctx.clearRect(0,0,128,128);
+        drawSpark(slideCounter++ * slideSpeed, numberOfLinePoints, waveTop, waveTops, sparkLevel, glowEvery, glowWidthScale, glowHeightScale);
+        ctx.strokeStyle='#FFFFFF';
+        ctx.lineWidth=lineWidth;
+        texture.update();
+        frameCounter = 0;
+        }
+    });
+
+    return scene;
+
+};

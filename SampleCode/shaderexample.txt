@@ -1,0 +1,90 @@
+function createCrystalBlock(color, ht, diameter, scene) {
+    let tess = 5;
+    let cylHt = ht*0.85;
+    let cyl = BABYLON.MeshBuilder.CreateCylinder("cyl", {height: cylHt, diameter: diameter, tessellation: tess}, scene);
+    let cone = BABYLON.MeshBuilder.CreateCylinder("cone", {height: ht-cylHt, diameterTop: 0, diameterBottom: diameter, tessellation: tess}, scene);
+    cone.position.y += ht/2.0;
+    let block = BABYLON.Mesh.MergeMeshes([cyl, cone]);
+    // tx.hasAlpha = true;
+    // mat.alpha = 0.4;
+    // mat.alphaMode = BABYLON.Engine.ALPHA_COMBINE;
+    //mat.alphaMode = BABYLON.Engine.ALPHA_ONEONE;
+    //mat.backFaceCulling = false;
+    // mat.diffuseColor = color;
+    //mat.emissiveColor = color;
+    //mat.ambientColor = color;
+
+    return block;
+}
+
+var createScene = function() {
+    var scene = new BABYLON.Scene(engine);
+
+    var camera = new BABYLON.ArcRotateCamera("Camera", Math.PI / 4, Math.PI / 4, 4, BABYLON.Vector3.Zero(), scene);
+
+    camera.attachControl(canvas, true);
+	
+	 var light = new BABYLON.HemisphericLight("light1", new BABYLON.Vector3(0, 1, 0), scene);
+
+    BABYLON.Effect.ShadersStore["customVertexShader"]= "\r\n"+   
+		"precision highp float;\r\n"+
+
+    	"// Attributes\r\n"+
+    	"attribute vec3 position;\r\n"+
+    	"attribute vec2 uv;\r\n"+
+
+    	"// Uniforms\r\n"+
+    	"uniform mat4 worldViewProjection;\r\n"+
+
+    	"// Varying\r\n"+
+    	"varying vec2 vUV;\r\n"+
+		"varying vec3 world_pos;\r\n"+
+		"varying vec3 world_normal;\r\n"+
+
+    	"void main(void) {\r\n"+
+		"    world_pos = mat3(world * position);\r\n" +
+		"    world_normal = normalize(mat3(model_matrix) * in_normal);\r\n" +
+    	"    gl_Position = worldViewProjection * vec4(position, 1.0);\r\n"+
+
+    	"    vUV = uv;\r\n"+
+    	"}\r\n";
+
+    BABYLON.Effect.ShadersStore["customFragmentShader"]="\r\n"+
+	   "precision highp float;\r\n"+
+
+    	"varying vec2 vUV;\r\n"+
+
+    	"uniform sampler2D textureSampler;\r\n"+
+
+    	"void main(void) {\r\n"+
+        "    vec4 blue = vec4(0.0, 0.0, 1.0, 1.0);\r\n" +
+        "    vec4 tx = texture2D(textureSampler, vUV);\r\n" +
+        "    if (tx.r < 0.3 && tx.g < 0.3 && tx.b < 0.3)\r\n" +
+    	"       gl_FragColor = mix(tx, blue, 0.5);\r\n" +
+        "    else\r\n" +
+        "       gl_FragColor = blue;\r\n" +
+    	"}\r\n";
+
+
+
+    var shaderMaterial = new BABYLON.ShaderMaterial("shader", scene, {
+        vertex: "custom",
+        fragment: "custom",
+	    },
+        {
+			attributes: ["position", "normal", "uv"],
+			uniforms: ["world", "worldView", "worldViewProjection", "view", "projection"]
+        });
+
+
+    var mainTexture = new BABYLON.Texture("textures/floor.png", scene);
+
+    shaderMaterial.setTexture("textureSampler", mainTexture);
+
+    shaderMaterial.backFaceCulling = false;
+
+    let crystal = createCrystalBlock(BABYLON.Color3.Blue(), 2, 0.4, scene);
+	crystal.material = shaderMaterial;
+
+    return scene;
+}

@@ -1,0 +1,63 @@
+var createCrystal = function (color, height, sideLen, scene) {
+    let myShape = [
+        new BABYLON.Vector3(-sideLen, sideLen, 0),
+        new BABYLON.Vector3(sideLen, sideLen, 0),
+        new BABYLON.Vector3(sideLen, -sideLen, 0),
+        new BABYLON.Vector3(-sideLen, -sideLen, 0),
+        new BABYLON.Vector3(-sideLen, sideLen, 0)
+    ];
+
+    let myPath = [
+        new BABYLON.Vector3(0, 0, 0),
+        new BABYLON.Vector3(0, 0, height*0.9),
+        new BABYLON.Vector3(0, 0, height)
+    ];
+    let scaleFunc = function(i, distance) {
+        if (i == 2)
+            return 0.01;
+        return 1;
+    }
+    let extruded = BABYLON.MeshBuilder.ExtrudeShapeCustom("ext", 
+        {shape: myShape, path: myPath, scaleFunction: scaleFunc, cap: BABYLON.Mesh.CAP_START, sideOrientation: BABYLON.Mesh.DOUBLESIDE}, scene);
+    let mat = new BABYLON.StandardMaterial("mat", scene);
+    mat.alpha = 0.4;
+    mat.alphaMode = BABYLON.Engine.ALPHA_COMBINE;
+    mat.backFaceCulling = false;
+    mat.diffuseColor = color;
+    mat.roughness = 1;
+    extruded.material = mat; 
+
+    return extruded;
+}
+
+var createScene = function () {
+
+    // This creates a basic Babylon Scene object (non-mesh)
+    var scene = new BABYLON.Scene(engine);
+
+    // This creates and positions a free camera (non-mesh)
+    var camera = new BABYLON.ArcRotateCamera("Camera", 0, 0, 20, BABYLON.Vector3.Zero(), scene);
+
+    // This targets the camera to scene origin
+    camera.setTarget(BABYLON.Vector3.Zero());
+
+    // This attaches the camera to the canvas
+    camera.attachControl(canvas, true);
+
+    // This creates a light, aiming 0,1,0 - to the sky (non-mesh)
+    var light = new BABYLON.HemisphericLight("light1", new BABYLON.Vector3(0, 5, 0), scene);
+
+    // Default intensity is 1. Let's dim the light a small amount
+    //light.intensity = 0.7;
+
+    let crystal1 = createCrystal(BABYLON.Color3.White(), 7, 0.3, scene);
+    crystal1.rotation.x = -Math.PI/8;
+    crystal1.rotation.y = -Math.PI/4;
+    
+    let crystal2 = createCrystal(BABYLON.Color3.White(), 6, 0.3, scene);
+    crystal2.rotation.x = -Math.PI/4;
+    crystal2.rotation.y = -Math.PI/8;
+
+    return scene;
+
+};
