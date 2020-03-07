@@ -121,5 +121,5 @@ if __name__ == "__main__":
     print(reverse_geocode.search([coord]))
     
     #gmap = gmplot.GoogleMapPlotter(coord[0], coord[1], 13)
-    #gmap.apikey = "AIzaSyAfD74ojnRtr4wZGLnRnr9VAQ2Lm40fQcQ"
+    #gmap.apikey = "xxxx"
     #gmap.draw("my_map.html")
