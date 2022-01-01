@@ -71,8 +71,8 @@ def getPrices(url):
 
 def sendMail(subject, msg_body, passwd):
     msg = MIMEText(msg_body)
-    sender = "rainzforever@hotmail.com"
-    receivers = ["yuzhao30@yahoo.com"]
+    sender = "xxxxx@hotmail.com"
+    receivers = ["xxxxxx@yahoo.com"]
     msg['Subject'] = subject
     msg['From'] = sender
     msg['To'] = receivers
